@@ -84,12 +84,12 @@ namespace metadata
         }
     }
 
-    Il2CppAssembly* Assembly::LoadFromBytes(const void* assemblyData, uint64_t length, bool copyData)
+    Il2CppAssembly* Assembly::LoadFromBytes(const void* assemblyData, uint64_t length, const void* assemblySymbolData, uint64_t symbolLength, bool copyData)
     {
         return Create((const byte*)assemblyData, length, copyData);
     }
 
-    Il2CppAssembly* Assembly::Create(const byte* assemblyData, uint64_t length, bool copyData)
+    Il2CppAssembly* Assembly::Create(const byte* assemblyData, uint64_t length, const void* assemblySymbolData, uint64_t symbolLength, bool copyData)
     {
         il2cpp::os::FastAutoLock lock(&il2cpp::vm::g_MetadataLock);
         if (!assemblyData)
