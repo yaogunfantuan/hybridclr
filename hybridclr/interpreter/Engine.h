@@ -52,6 +52,11 @@ namespace interpreter
 			_exceptionFlowBase = (ExceptionFlowInfo*)IL2CPP_CALLOC(hc.GetInterpreterThreadExceptionFlowSize(), sizeof(ExceptionFlowInfo));
 			_exceptionFlowCount = (int32_t)hc.GetInterpreterThreadExceptionFlowSize();
 			_exceptionFlowTopIdx = 0;
+#if IL2CPP_MONO_DEBUGGER
+			_frameSpExeCtxBase = (Il2CppSequencePointExecutionContext*)IL2CPP_CALLOC(hc.GetInterpreterThreadFrameStackSize(), sizeof(Il2CppSequencePointExecutionContext));
+			_frameSpExeCtxCount = (int32_t)hc.GetInterpreterThreadFrameStackSize();
+			_frameSpExeCtxTopIdx = 0;
+#endif
 		}
 
 		~MachineState()
@@ -144,6 +149,19 @@ namespace interpreter
 			il2cpp::vm::Exception::Raise(il2cpp::vm::Exception::GetExecutionEngineException("AllocExceptionFlowZero"));
 			return nullptr;
 		}
+#if IL2CPP_MONO_DEBUGGER
+		Il2CppSequencePointExecutionContext* AllocSpExeCtx()
+		{
+			if (_frameSpExeCtxTopIdx + 1 < _frameSpExeCtxCount)
+			{
+				Il2CppSequencePointExecutionContext* ctx = _frameSpExeCtxBase + _frameSpExeCtxTopIdx;
+				_frameSpExeCtxTopIdx += 1;
+				return ctx;
+			}
+			il2cpp::vm::Exception::Raise(il2cpp::vm::Exception::GetExecutionEngineException("AllocExceptionFlowZero"));
+			return nullptr;
+		}	
+#endif
 
 		uint32_t GetExceptionFlowTopIdx() const
 		{
@@ -212,7 +230,11 @@ namespace interpreter
 		ExceptionFlowInfo* _exceptionFlowBase;
 		int32_t _exceptionFlowTopIdx;
 		int32_t _exceptionFlowCount;
-
+#if IL2CPP_MONO_DEBUGGER
+		Il2CppSequencePointExecutionContext* _frameSpExeCtxBase;
+		int32_t _frameSpExeCtxTopIdx;
+		int32_t _frameSpExeCtxCount;
+#endif
 
 		std::stack<const Il2CppImage*> _executingImageStack;
 	};
@@ -263,7 +285,14 @@ namespace interpreter
 			int32_t oldStackTop = _machineState.GetStackTop();
 			StackObject* stackBasePtr = _machineState.AllocStackSlot(imi->maxStackSize - imi->argStackObjectSize);
 			InterpFrame* newFrame = _machineState.PushFrame();
-			*newFrame = { imi, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0 };
+#if !IL2CPP_MONO_DEBUGGER
+			DECLARE_METHOD_EXEC_CTX(methodExecutionContext, nullptr, nullptr, nullptr, nullptr);
+			Il2CppSequencePointExecutionContext* ctx = _machineState.AllocSpExeCtx();
+			*ctx = methodExecutionContext;
+			*newFrame = { imi, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0, ctx };
+#else
+			*newFrame = { imi, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0};
+#endif
 			PUSH_STACK_FRAME(imi->method);
 			return newFrame;
 		}
@@ -277,8 +306,14 @@ namespace interpreter
 			int32_t oldStackTop = _machineState.GetStackTop();
 			StackObject* stackBasePtr = _machineState.AllocStackSlot(imi->maxStackSize);
 			InterpFrame* newFrame = _machineState.PushFrame();
+#if IL2CPP_MONO_DEBUGGER
+			DECLARE_METHOD_EXEC_CTX(methodExecutionContext, nullptr, nullptr, nullptr, nullptr);
+			Il2CppSequencePointExecutionContext* ctx = _machineState.AllocSpExeCtx();
+			*ctx = methodExecutionContext;
+			*newFrame = { imi, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0, ctx };
+#else
 			*newFrame = { imi, stackBasePtr, oldStackTop, nullptr, nullptr, nullptr, 0, 0 };
-
+#endif
 			// if not prepare arg stack. copy from args
 			if (imi->args)
 			{

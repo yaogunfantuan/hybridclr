@@ -75,6 +75,9 @@ namespace hybridclr
 			int32_t exFlowCount;
 			int32_t exFlowCapaticy;
 
+#if IL2CPP_MONO_DEBUGGER
+			Il2CppSequencePointExecutionContext* spExecCtx;
+#endif
 			ExceptionFlowInfo* GetCurExFlow() const
 			{
 				return exFlowCount > 0 ? exFlowBase + exFlowCount - 1 : nullptr;
