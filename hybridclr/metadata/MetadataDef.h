@@ -87,7 +87,11 @@ namespace metadata
 	};
 #pragma pack(pop)
 
+#if IL2CPP_MONO_DEBUGGER
+	const int MAX_TABLE_INDEX = 0x37;
+#else
 	const int MAX_TABLE_INDEX = 0x2C;
+#endif
 	const int TABLE_NUM = MAX_TABLE_INDEX + 1;
 
 	class TagBits

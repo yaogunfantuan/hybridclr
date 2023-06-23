@@ -837,7 +837,10 @@ namespace interpreter
 		NewString_3,
 		UnsafeEnumCast,
 		AssemblyGetExecutingAssembly,
-
+#if IL2CPP_MONO_DEBUGGER
+		DebuggerCheckSeqPoint,
+		DebuggerStoreSeqPoint
+#endif
 		//!!!}}OPCODE
 	};
 
@@ -9482,6 +9485,21 @@ namespace interpreter
 		uint8_t __pad7;
 	};
 
+	#if IL2CPP_MONO_DEBUGGER
+	struct IRDebuggerCheckSeqPoint : IRCommon
+	{
+		uint32_t methodToken;
+		uint32_t ilOffset;
+	};
+	struct IRDebuggerStoreSeqPoint : IRCommon
+	{
+		uint16_t ret;
+		uint8_t __pad4;
+		uint8_t __pad5;
+		uint8_t __pad6;
+		uint8_t __pad7;
+	};
+	#endif
 
 	//!!!}}INST
 #pragma pack(pop)

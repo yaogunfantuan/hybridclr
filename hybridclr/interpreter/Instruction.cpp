@@ -821,7 +821,9 @@ namespace interpreter
 		8,
 		8,
 		8,
-
+#if IL2CPP_MONO_DEBUGGER
+		16,
+#endif
         //!!!}}INST_SIZE
     };
 }

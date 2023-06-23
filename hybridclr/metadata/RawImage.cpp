@@ -46,82 +46,114 @@ namespace hybridclr
 			_ptrRawDataEnd = imageData + length;
 
 			const byte* imageDataEnd = imageData + length;
-			const byte* ptr_lfanew = imageData + 0x3c;
-			uint32_t lfanew = *(uint32_t*)ptr_lfanew;
-			if (lfanew >= length)
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
+			_CLIHeader = nullptr;
+
+			uint16_t numStreamHeader = 0;
+			const StreamHeader* ptrStreamHeaders = nullptr;
+			byte* ptr = (byte*)_ptrRawData;
+			if (strncmp ((const char*)ptr, "BSJB", 4) == 0){
+				uint32_t version_string_len;
+				ptr += 4;
+				uint16_t md_version_major = *(uint16_t*)(ptr);
+				ptr += 2;
+				uint16_t md_version_minor = *(uint16_t*)(ptr);
+				ptr += 6;
+
+				version_string_len = *(uint32_t*) (ptr);
+				ptr += 4;
+				//image->version = g_strndup (ptr, version_string_len);
+				ptr += version_string_len;
+				uint32_t pad = ptr - _ptrRawData;
+				if (pad % 4){
+					ptr += 4 - (pad % 4);
+				}
+				ptr+=2;
+				_ptrMetaData = _ptrRawData;
+				numStreamHeader = *(uint16_t*)(ptr);
+				ptr+=2;
+				ptrStreamHeaders = (const StreamHeader*)(ptr);
+
+			}else{
+				const byte* ptr_lfanew = imageData + 0x3c;
+				uint32_t lfanew = *(uint32_t*)ptr_lfanew;
+				if (lfanew >= length)
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+
+				const byte* ptrSig = imageData + lfanew;
+				/*if (ptr_sig[0] != 'P' || ptr_sig[1] != 'E' || ptr_sig[2] != 0 || ptr_sig[3] != 0)*/
+				if (std::strncmp((const char*)ptrSig, "PE\0\0", 4))
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+
+				_PEHeader = (PEHeader*)(ptrSig + 4);
+
+				_isDll = (_PEHeader->characteristics & 0x2000);
+				// std::cout << "load " << (_isDll ? "dll" : "exe") << std::endl;
+
+				// optional size may be 224(32bit matchine) or 240 (64bit)
+				if (_PEHeader->optionalHeadersize != kOptionalHeaderSize32 && _PEHeader->optionalHeadersize != kOptionalHeaderSize64)
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+				bool is32BitFormat = _PEHeader->optionalHeadersize == kOptionalHeaderSize32;
+
+				const PEDirEntry* ptrCLIHeaderEntry = (PEDirEntry*)(((byte*)_PEHeader)
+					+ 20 /* pe header size */
+					+ (is32BitFormat ? kCliHeaderOffset32 : kCliHeaderOffset64) /* pe optional header -> pe header data directories -> cli header */);
+
+
+				_PESectionHeaders = (PESectionHeader*)((byte*)_PEHeader + 20 + _PEHeader->optionalHeadersize);
+
+				uint32_t cLIHeaderOffset;
+				if (!TranslateRVAToImageOffset(ptrCLIHeaderEntry->rva, cLIHeaderOffset))
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+				if (cLIHeaderOffset >= length)
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+
+				const CLIHeader* ptrCLIHeader = _CLIHeader = (const CLIHeader*)(imageData + cLIHeaderOffset);
+
+				uint32_t metaOffset;
+				if (!TranslateRVAToImageOffset(ptrCLIHeader->metaData.rva, metaOffset))
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+				if (metaOffset >= length)
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+
+				_ptrMetaRoot = (const MetadataRootPartial*)(imageData + metaOffset);
+				if (_ptrMetaRoot->signature != 0x424A5342)
+				{
+					return LoadImageErrorCode::BAD_IMAGE;
+				}
+				_ptrMetaData = (const byte*)_ptrMetaRoot;
+				numStreamHeader = *(uint16_t*)(_ptrMetaData + 16 + _ptrMetaRoot->length + 2);
+				ptrStreamHeaders = (const StreamHeader*)(_ptrMetaData + 16 + _ptrMetaRoot->length + 4);
 			}
-
-			const byte* ptrSig = imageData + lfanew;
-			/*if (ptr_sig[0] != 'P' || ptr_sig[1] != 'E' || ptr_sig[2] != 0 || ptr_sig[3] != 0)*/
-			if (std::strncmp((const char*)ptrSig, "PE\0\0", 4))
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
-			}
-
-			_PEHeader = (PEHeader*)(ptrSig + 4);
-
-			_isDll = (_PEHeader->characteristics & 0x2000);
-			// std::cout << "load " << (_isDll ? "dll" : "exe") << std::endl;
-
-			// optional size may be 224(32bit matchine) or 240 (64bit)
-			if (_PEHeader->optionalHeadersize != kOptionalHeaderSize32 && _PEHeader->optionalHeadersize != kOptionalHeaderSize64)
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
-			}
-			bool is32BitFormat = _PEHeader->optionalHeadersize == kOptionalHeaderSize32;
-
-			const PEDirEntry* ptrCLIHeaderEntry = (PEDirEntry*)(((byte*)_PEHeader)
-				+ 20 /* pe header size */
-				+ (is32BitFormat ? kCliHeaderOffset32 : kCliHeaderOffset64) /* pe optional header -> pe header data directories -> cli header */);
-
-
-			_PESectionHeaders = (PESectionHeader*)((byte*)_PEHeader + 20 + _PEHeader->optionalHeadersize);
-
-			uint32_t cLIHeaderOffset;
-			if (!TranslateRVAToImageOffset(ptrCLIHeaderEntry->rva, cLIHeaderOffset))
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
-			}
-			if (cLIHeaderOffset >= length)
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
-			}
-
-			const CLIHeader* ptrCLIHeader = _CLIHeader = (const CLIHeader*)(imageData + cLIHeaderOffset);
-
-			uint32_t metaOffset;
-			if (!TranslateRVAToImageOffset(ptrCLIHeader->metaData.rva, metaOffset))
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
-			}
-			if (metaOffset >= length)
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
-			}
-
-			_ptrMetaRoot = (const MetadataRootPartial*)(imageData + metaOffset);
-			if (_ptrMetaRoot->signature != 0x424A5342)
-			{
-				return LoadImageErrorCode::BAD_IMAGE;
-			}
+			
 			//std::cout << "version:" << (const char*)&(_ptrMetaRoot->versionFirstByte) << std::endl;
-			_ptrMetaData = (const byte*)_ptrMetaRoot;
-
-			uint16_t numStreamHeader = *(uint16_t*)(_ptrMetaData + 16 + _ptrMetaRoot->length + 2);
-			const StreamHeader* ptrStreamHeaders = (const StreamHeader*)(_ptrMetaData + 16 + _ptrMetaRoot->length + 4);
+			
 
 			const StreamHeader* curSH = ptrStreamHeaders;
 			const size_t maxStreamNameSize = 16;
 			for (int i = 0; i < numStreamHeader; i++)
 			{
 				//std::cout << "name:" << (char*)curSH->name << ", offset:" << curSH->offset << ", size:" << curSH->size << std::endl;
-
-				if (curSH->offset >= ptrCLIHeader->metaData.size)
-				{
-					return LoadImageErrorCode::BAD_IMAGE;
+				if (_CLIHeader){
+					if (curSH->offset >= _CLIHeader->metaData.size)
+					{
+						return LoadImageErrorCode::BAD_IMAGE;
+					}
 				}
+				
 				CliStream* rs = nullptr;
 				CliStream nonStandardStream;
 				CliStream pdbStream;
@@ -514,7 +546,47 @@ namespace hybridclr
 				table.push_back({ ComputTableIndexByte(TableType::GENERICPARAM) });
 				table.push_back({ ComputTableIndexByte(TableType::TYPEDEF, TableType::TYPEREF, TableType::TYPESPEC, TagBits::TypeDefOrRef) });
 			}
+			{
+				auto& table = _tableRowMetas[(int)TableType::DOCUMENT];
+				table.push_back({ ComputBlobIndexByte() });
+				table.push_back({ ComputGUIDIndexByte() });
+				table.push_back({ ComputBlobIndexByte() });
+				table.push_back({ ComputGUIDIndexByte() });
+			}
+			{
+				auto& table = _tableRowMetas[(int)TableType::METHODBODY];
+				table.push_back({ ComputTableIndexByte(TableType::DOCUMENT) });
+				table.push_back({ ComputBlobIndexByte() });
+			}
+			{
+				auto& table = _tableRowMetas[(int)TableType::LOCALSCOPE];
+				table.push_back({ ComputTableIndexByte(TableType::METHOD) });
+				table.push_back({ ComputTableIndexByte(TableType::IMPORTSCOPE) });
+				table.push_back({ ComputTableIndexByte(TableType::LOCALVARIABLE) });
+				table.push_back({ ComputTableIndexByte(TableType::LOCALCONSTANT) });
+				table.push_back({ 4 });
+				table.push_back({ 4 });
 
+			}
+
+			{
+				auto& table = _tableRowMetas[(int)TableType::LOCALVARIABLE];
+				table.push_back({ 2 });
+				table.push_back({ 2 });
+				table.push_back({ ComputStringIndexByte() });
+			}
+
+			{
+				auto& table = _tableRowMetas[(int)TableType::LOCALCONSTANT];
+				table.push_back({ 0 });
+				table.push_back({ 0 });
+			}
+
+			{
+				auto& table = _tableRowMetas[(int)TableType::IMPORTSCOPE];
+				table.push_back({ 0 });
+				table.push_back({ 0 });
+			}
 
 			for (int i = 0; i < TABLE_NUM; i++)
 			{
@@ -703,15 +775,16 @@ namespace hybridclr
 			case TableType::UNUSED10:
 				LogPanic("unused table type");
 				return 0;
-			case TableType::DOCUMENT: // return 84;
-			case TableType::METHODBODY: // return 52;
-			case TableType::LOCALSCOPE:  // return 20;
-			case TableType::LOCALVARIABLE: // return 56;
+			case TableType::DOCUMENT: return ComputBlobIndexByte() * 2 + ComputGUIDIndexByte() * 2;
+			case TableType::METHODBODY: return ComputTableIndexByte(TableType::DOCUMENT) + ComputBlobIndexByte();
+			case TableType::LOCALSCOPE:  return ComputTableIndexByte(TableType::METHOD) + ComputTableIndexByte(TableType::IMPORTSCOPE)
+				+ ComputTableIndexByte(TableType::LOCALVARIABLE) + ComputTableIndexByte(TableType::LOCALCONSTANT) + 4 * 2;
+			case TableType::LOCALVARIABLE: return 2 * 2 + ComputStringIndexByte();
 			case TableType::LOCALCONSTANT: // return 24;
-			case TableType::IMPORTSCOPE: // return 8;
+			case TableType::IMPORTSCOPE: //return ComputTableIndexByte(TableType::IMPORTSCOPE) + ComputBlobIndexByte();
 			case TableType::STATEMACHINEMETHOD:
 			case TableType::CUSTOMDEBUGINFORMATION:
-				LogPanic("not support pdb table");
+				//LogPanic("not support pdb table");
 				return 0;
 			default:
 				LogPanic("unknown table type");

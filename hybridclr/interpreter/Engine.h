@@ -53,7 +53,7 @@ namespace interpreter
 			_exceptionFlowCount = (int32_t)hc.GetInterpreterThreadExceptionFlowSize();
 			_exceptionFlowTopIdx = 0;
 #if IL2CPP_MONO_DEBUGGER
-			_frameSpExeCtxBase = (Il2CppSequencePointExecutionContext*)IL2CPP_CALLOC(hc.GetInterpreterThreadFrameStackSize(), sizeof(Il2CppSequencePointExecutionContext));
+			_frameSpExeCtxBase = (debugger::InterpreterSequencePointExecutionContext*)IL2CPP_CALLOC(hc.GetInterpreterThreadFrameStackSize(), sizeof(debugger::InterpreterSequencePointExecutionContext));
 			_frameSpExeCtxCount = (int32_t)hc.GetInterpreterThreadFrameStackSize();
 			_frameSpExeCtxTopIdx = 0;
 #endif
@@ -150,17 +150,21 @@ namespace interpreter
 			return nullptr;
 		}
 #if IL2CPP_MONO_DEBUGGER
-		Il2CppSequencePointExecutionContext* AllocSpExeCtx()
+		debugger::InterpreterSequencePointExecutionContext* AllocSpExeCtx()
 		{
 			if (_frameSpExeCtxTopIdx + 1 < _frameSpExeCtxCount)
 			{
-				Il2CppSequencePointExecutionContext* ctx = _frameSpExeCtxBase + _frameSpExeCtxTopIdx;
+				debugger::InterpreterSequencePointExecutionContext* ctx = _frameSpExeCtxBase + _frameSpExeCtxTopIdx;
 				_frameSpExeCtxTopIdx += 1;
 				return ctx;
 			}
 			il2cpp::vm::Exception::Raise(il2cpp::vm::Exception::GetExecutionEngineException("AllocExceptionFlowZero"));
 			return nullptr;
 		}	
+		void FreeSpExeCtx(debugger::InterpreterSequencePointExecutionContext* ctx) {
+			_frameSpExeCtxTopIdx = (int32_t)(ctx - _frameSpExeCtxBase);
+			IL2CPP_ASSERT(_frameSpExeCtxTopIdx >= 0 && _frameSpExeCtxTopIdx <= _frameSpExeCtxCount);
+		}
 #endif
 
 		uint32_t GetExceptionFlowTopIdx() const
@@ -231,7 +235,7 @@ namespace interpreter
 		int32_t _exceptionFlowTopIdx;
 		int32_t _exceptionFlowCount;
 #if IL2CPP_MONO_DEBUGGER
-		Il2CppSequencePointExecutionContext* _frameSpExeCtxBase;
+		debugger::InterpreterSequencePointExecutionContext* _frameSpExeCtxBase;
 		int32_t _frameSpExeCtxTopIdx;
 		int32_t _frameSpExeCtxCount;
 #endif
@@ -285,10 +289,9 @@ namespace interpreter
 			int32_t oldStackTop = _machineState.GetStackTop();
 			StackObject* stackBasePtr = _machineState.AllocStackSlot(imi->maxStackSize - imi->argStackObjectSize);
 			InterpFrame* newFrame = _machineState.PushFrame();
-#if !IL2CPP_MONO_DEBUGGER
-			DECLARE_METHOD_EXEC_CTX(methodExecutionContext, nullptr, nullptr, nullptr, nullptr);
-			Il2CppSequencePointExecutionContext* ctx = _machineState.AllocSpExeCtx();
-			*ctx = methodExecutionContext;
+#if IL2CPP_MONO_DEBUGGER
+			debugger::InterpreterSequencePointExecutionContext* ctx = _machineState.AllocSpExeCtx();
+			ctx = new (ctx) debugger::InterpreterSequencePointExecutionContext(imi,argBase);
 			*newFrame = { imi, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0, ctx };
 #else
 			*newFrame = { imi, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0};
@@ -307,9 +310,8 @@ namespace interpreter
 			StackObject* stackBasePtr = _machineState.AllocStackSlot(imi->maxStackSize);
 			InterpFrame* newFrame = _machineState.PushFrame();
 #if IL2CPP_MONO_DEBUGGER
-			DECLARE_METHOD_EXEC_CTX(methodExecutionContext, nullptr, nullptr, nullptr, nullptr);
-			Il2CppSequencePointExecutionContext* ctx = _machineState.AllocSpExeCtx();
-			*ctx = methodExecutionContext;
+			debugger::InterpreterSequencePointExecutionContext* ctx = _machineState.AllocSpExeCtx();
+			ctx = new (ctx) debugger::InterpreterSequencePointExecutionContext(imi, argBase);
 			*newFrame = { imi, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0, ctx };
 #else
 			*newFrame = { imi, stackBasePtr, oldStackTop, nullptr, nullptr, nullptr, 0, 0 };
@@ -343,6 +345,10 @@ namespace interpreter
 			{
 				_machineState.SetExceptionFlowTop(frame->exFlowBase);
 			}
+#if IL2CPP_MONO_DEBUGGER
+			frame->spExecCtx->~InterpreterSequencePointExecutionContext();
+			_machineState.FreeSpExeCtx(frame->spExecCtx);
+#endif
 			_machineState.PopFrame();
 			_machineState.SetStackTop(frame->oldStackTop);
 			return _machineState.GetFrameTopIdx() > _frameBaseIdx ? _machineState.GetTopFrame() : nullptr;

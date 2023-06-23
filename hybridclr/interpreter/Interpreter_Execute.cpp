@@ -11078,7 +11078,20 @@ else \
 				    ip += 8;
 				    continue;
 				}
-
+	#pragma region EXCEPTION
+	#if IL2CPP_MONO_DEBUGGER
+				case HiOpcodeEnum::DebuggerCheckSeqPoint:
+				{
+					uint32_t __methodIndex = *(uint32_t*)(ip + 2);
+					uint32_t __ilOffset = *(uint32_t*)(ip + 6);
+					InterpreterImage* iImage = hybridclr::metadata::MetadataModule::GetImage(imi->method->klass);
+					Il2CppSequencePoint* sp = iImage->GetIl2CppSequencePoint(__methodIndex, __ilOffset);
+					CHECK_SEQ_POINT(*frame->spExecCtx->GetIl2CppSequencePointExecutionContext(), sp);
+					ip += 16;
+					continue;
+				}
+	#endif
+	#pragma endregion
 				//!!!}}INSTRINCT
 #pragma endregion
 				default:

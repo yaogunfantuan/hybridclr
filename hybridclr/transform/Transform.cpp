@@ -382,6 +382,30 @@ else \
 		{
 			int32_t ipOffset = (int32_t)(ip - ipBase);
 			curbb = ip2bb[ipOffset];
+
+#if IL2CPP_MONO_DEBUGGER
+			if (metadata::IsInterpreterMethod(methodInfo)) {
+				InterpreterImage* iImage = hybridclr::metadata::MetadataModule::GetImage(methodInfo->klass);
+				Il2CppSequencePoint* sp = iImage->GetIl2CppSequencePoint(methodInfo->token,ipOffset);
+				if (sp) {
+					switch ((OpcodeValue)*ip)
+					{
+						case OpcodeValue::CALL:
+						case OpcodeValue::CALLI:
+							CreateAddIR(ir, DebuggerStoreSeqPoint);
+							ir->methodToken = methodInfo->token;
+							ir->ilOffset = ipOffset;
+							break;
+						default:
+							CreateAddIR(ir, DebuggerCheckSeqPoint);
+							ir->methodToken = methodInfo->token;
+							ir->ilOffset = ipOffset;
+							break;
+					}
+					
+				}
+			}
+#endif
 			if (curbb != lastBb)
 			{
 				if (curbb && !curbb->visited)

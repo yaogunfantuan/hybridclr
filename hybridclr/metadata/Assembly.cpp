@@ -86,10 +86,10 @@ namespace metadata
 
     Il2CppAssembly* Assembly::LoadFromBytes(const void* assemblyData, uint64_t length, const void* assemblySymbolData, uint64_t symbolLength, bool copyData)
     {
-        return Create((const byte*)assemblyData, length, copyData);
+        return Create((const byte*)assemblyData, length, (const byte*)assemblySymbolData, symbolLength, copyData);
     }
 
-    Il2CppAssembly* Assembly::Create(const byte* assemblyData, uint64_t length, const void* assemblySymbolData, uint64_t symbolLength, bool copyData)
+    Il2CppAssembly* Assembly::Create(const byte* assemblyData, uint64_t length, const byte* assemblySymbolData, uint64_t symbolLength, bool copyData)
     {
         il2cpp::os::FastAutoLock lock(&il2cpp::vm::g_MetadataLock);
         if (!assemblyData)
@@ -103,13 +103,19 @@ namespace metadata
             il2cpp::vm::Exception::Raise(il2cpp::vm::Exception::GetArgumentException("exceed max image index", ""));
         }
         InterpreterImage* image = new InterpreterImage(imageId);
+        InterpreterImage* debugImage = new InterpreterImage(imageId);
         
         if (copyData)
         {
             assemblyData = (const byte*)CopyBytes(assemblyData, length);
+            if (assemblySymbolData){
+                assemblySymbolData = (const byte*)CopyBytes(assemblySymbolData, symbolLength);
+            }
         }
         LoadImageErrorCode err = image->Load(assemblyData, (size_t)length);
-
+        if (assemblySymbolData){
+            debugImage->Load(assemblySymbolData, (size_t)symbolLength);
+        }
 
         if (err != LoadImageErrorCode::OK)
         {
@@ -153,7 +159,13 @@ namespace metadata
         image2->assembly = ass;
 
         image->InitRuntimeMetadatas();
-
+        if (debugImage) {
+            debugImage->InitRuntimeMetadatas();
+            image->SetPdbImage(debugImage);
+            Il2CppCodeGenModule* codeGenModule = (Il2CppCodeGenModule*)IL2CPP_MALLOC_ZERO(sizeof(Il2CppCodeGenModule));
+            codeGenModule->debuggerMetadata = debugImage->GetDebuggerMetadataRegistration(image);
+            image2->codeGenModule = codeGenModule;
+        }
         return ass;
     }
 }

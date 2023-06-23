@@ -371,25 +371,36 @@ namespace metadata
     // size 84
     struct TbSymbolDocument
     {
-
+        uint32_t name;
+        uint32_t hashAlgId;
+        uint32_t hash;
+        uint32_t language;
     };
 
     // size 52
     struct TbSymbolMethodBody
     {
-
+        uint32_t document;
+        uint32_t sequencePoints;
     };
 
     // size 20
     struct TbSymbolLocalScope
     {
-
+        uint32_t methodDefIndex;
+        uint32_t importScopeIndex;
+        uint32_t localVarIndex;
+        uint32_t localConstantIndex;
+        uint32_t startOffset;
+        uint32_t length;
     };
 
     // size 56
     struct TbSymbolLocalVariable
     {
-
+        uint16_t attributes;
+        uint16_t index;
+        uint32_t name;
     };
 
     // size 24
@@ -401,7 +412,8 @@ namespace metadata
     // SymUsing. size 8
     struct TbSymbolImportScope
     {
-
+        uint32_t parent;
+        uint32_t importsIndex; //blob
     };
 
 

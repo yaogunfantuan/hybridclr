@@ -301,6 +301,12 @@ TABLE_END
 			TABLE3(ClassLayout, TableType::CLASSLAYOUT, packingSize, classSize, parent)
 			TABLE2(InterfaceImpl, TableType::INTERFACEIMPL, classIdx, interfaceIdx)
 
+			TABLE4(SymbolDocument, TableType::DOCUMENT, name, hashAlgId,hash,language)
+			TABLE2(SymbolMethodBody, TableType::METHODBODY, document, sequencePoints)
+			TABLE6(SymbolLocalScope, TableType::LOCALSCOPE, methodDefIndex, importScopeIndex,localVarIndex,localConstantIndex,startOffset,length)
+			TABLE3(SymbolLocalVariable, TableType::LOCALVARIABLE, attributes,index,name)
+			TABLE2(SymbolImportScope, TableType::IMPORTSCOPE, parent,importsIndex)
+
 			TABLE_BEGIN(Assembly, TableType::ASSEMBLY)
 			__F(hashAlgId)
 			__F(majorVersion)

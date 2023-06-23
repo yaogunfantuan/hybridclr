@@ -1,6 +1,7 @@
 #pragma once
 #include "../CommonDef.h"
 #include "../metadata/MetadataDef.h"
+#include "../debugger/InterpreterSequencePointExecutionContext.h"
 
 namespace hybridclr
 {
@@ -76,7 +77,7 @@ namespace hybridclr
 			int32_t exFlowCapaticy;
 
 #if IL2CPP_MONO_DEBUGGER
-			Il2CppSequencePointExecutionContext* spExecCtx;
+			debugger::InterpreterSequencePointExecutionContext* spExecCtx;
 #endif
 			ExceptionFlowInfo* GetCurExFlow() const
 			{

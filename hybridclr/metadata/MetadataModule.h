@@ -69,6 +69,12 @@ namespace metadata
 			return hybridclr::metadata::EncodeImageAndMetadataIndex(image->GetIndex(), image->GetTypeRawIndex(typeDef));
 		}
 
+		static uint32_t GetMethodEncodeIndex(const MethodInfo* methodInfo) 
+		{
+			InterpreterImage* image = GetImage(methodInfo->klass->typeDefinition);
+			return hybridclr::metadata::EncodeImageAndMetadataIndex(image->GetIndex(), image->GetMethodRawIndex(methodInfo));
+		}
+
 		static Il2CppMetadataTypeHandle GetAssemblyTypeHandleFromRawIndex(const Il2CppImage* image, AssemblyTypeIndex index)
 		{
 			return GetImage(image)->GetAssemblyTypeHandleFromRawIndex(index);

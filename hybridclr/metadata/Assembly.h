@@ -13,7 +13,7 @@ namespace metadata
         static void InitializePlaceHolderAssemblies();
         static Il2CppAssembly* LoadFromBytes(const void* assemblyData, uint64_t length, const void* assemblySymbolData, uint64_t symbolLength, bool copyData);
     private:
-        static Il2CppAssembly* Create(const byte* assemblyData, uint64_t length, const void* assemblySymbolData, uint64_t symbolLength, bool copyData);
+        static Il2CppAssembly* Create(const byte* assemblyData, uint64_t length, const byte* assemblySymbolData, uint64_t symbolLength, bool copyData);
     };
 }
 }

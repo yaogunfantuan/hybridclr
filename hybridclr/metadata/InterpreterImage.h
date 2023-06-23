@@ -77,6 +77,41 @@ namespace metadata
 		int32_t typeRangeIndex;
 	};
 
+	struct SourceFileInfo
+	{
+		const char* fileName;
+		uint8_t* hash;
+	};
+
+	struct SequencePointInfo
+	{
+		uint32_t lineStart, lineEnd;
+		uint32_t columnStart, columnEnd;
+		uint32_t ilOffset;
+	};
+	struct MethodSequencePointInfo
+	{
+		uint32_t index;
+		uint32_t localSignature;
+		uint32_t sourceFileIndex;
+		std::vector<SequencePointInfo> sequencePoints;
+	};
+	struct MethodLocalVarScope
+	{
+		uint32_t methodDefIndex;
+        uint32_t importScopeIndex;
+        uint32_t localVarIndex;
+        uint32_t localConstantIndex;
+        uint32_t startOffset;
+        uint32_t length;
+	};
+	
+	struct MethodLocalVar{
+		uint16_t attribute;
+		const char* name;
+	};
+	
+
 	class InterpreterImage : public Image
 	{
 	public:
@@ -101,7 +136,7 @@ namespace metadata
 
 	public:
 
-		InterpreterImage(uint32_t imageIndex) : _index(imageIndex), _inited(false), _il2cppImage(nullptr)
+		InterpreterImage(uint32_t imageIndex) : _index(imageIndex), _inited(false), _il2cppImage(nullptr),_pdbImage(nullptr),_pdbMetadata(nullptr)
 		{
 
 		}
@@ -174,6 +209,11 @@ namespace metadata
 		{
 			IL2CPP_ASSERT(DecodeImageIndex(index) == 0);
 			return _rawImage.GetStringFromRawIndex(index);
+		}
+
+		uint32_t GetMethodRawIndex(const MethodInfo* methodInfo) const
+		{
+			return DecodeTokenRowIndex(methodInfo->token) - 1;
 		}
 
 		uint32_t GetTypeRawIndex(const Il2CppTypeDefinition* typeDef) const
@@ -480,6 +520,11 @@ namespace metadata
 		void BuildIl2CppAssembly(Il2CppAssembly* assembly);
 
 		void InitRuntimeMetadatas() override;
+		void SetPdbImage(InterpreterImage* image) {
+			_pdbImage = image;
+		}
+		Il2CppDebuggerMetadataRegistration* GetDebuggerMetadataRegistration(const InterpreterImage* parentImage);
+		Il2CppSequencePoint* GetIl2CppSequencePoint(uint32_t token,uint32_t ilOffset);
 	protected:
 
 		void InitTypeDefs_0();
@@ -508,6 +553,7 @@ namespace metadata
 		void InitMethodSemantics();
 		void InitInterfaces();
 		void InitVTables();
+		void InitMethodDebugInformation();
 
 		void ComputeBlittable(Il2CppTypeDefinition* def, std::vector<bool>& computFlags);
 		void ComputeVTable(TypeDefinitionDetail* tdd);
@@ -568,6 +614,17 @@ namespace metadata
 
 		std::vector<PropertyDetail> _propeties;
 		std::vector<EventDetail> _events;
+
+
+		InterpreterImage* _pdbImage;
+		Il2CppDebuggerMetadataRegistration* _pdbMetadata;
+		std::vector<SourceFileInfo> _sourceFileInfos;
+		std::vector<MethodSequencePointInfo> _methodSequencePointInfos;
+		std::unordered_map<uint64_t, Il2CppSequencePoint*> _method2SPCache;
+		std::vector<MethodLocalVarScope> _methodLocalVarScopes;
+		std::vector<std::pair<uint32_t,uint32_t>> _methodLocalVarScopesIndexes;
+		std::vector<MethodLocalVar> _methodLocalVar;
+		std::unordered_map<uint64_t, MethodLocalVar*> _method2LocalVarCache;
 	};
 }
 }
